@@ -60,21 +60,34 @@ function App() {
     initializedRef.current = true;
   }, [chats, setChats]);
 
-  // Auto-scroll to bottom
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Auto-scroll to bottom (optimized to prevent glitching)
+  const scrollToBottom = useCallback((smooth = false) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: smooth ? 'smooth' : 'auto',
+        block: 'end'
+      });
+    }
+  }, []);
 
+  // Only scroll on chat change, not during streaming
   useEffect(() => {
-    scrollToBottom();
-  }, [chats, currentChatId]);
+    if (!isLoading) {
+      scrollToBottom(true);
+    }
+  }, [currentChatId, scrollToBottom, isLoading]);
 
-  // Dynamic textarea resizing
+  // Dynamic textarea resizing (optimized with requestAnimationFrame)
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const scrollHeight = textareaRef.current.scrollHeight;
-      textareaRef.current.style.height = `${Math.min(scrollHeight, TEXTAREA_MAX_HEIGHT)}px`;
+      // Use RAF to prevent layout thrashing
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          const scrollHeight = textareaRef.current.scrollHeight;
+          textareaRef.current.style.height = `${Math.min(scrollHeight, TEXTAREA_MAX_HEIGHT)}px`;
+        }
+      });
     }
   }, [input]);
 
@@ -243,9 +256,9 @@ function App() {
             isStreaming: true,
           });
           lastUpdateTime = now;
+          // Throttled instant scroll during streaming
+          scrollToBottom(false);
         }
-
-        scrollToBottom();
       },
       // onComplete
       ({ content, tokensPerSecond, totalTokens, responseTime }) => {

@@ -50,6 +50,35 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Global Scrollbar Theming */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .app {
   display: flex;
   height: 100vh;
@@ -63,11 +92,16 @@ body {
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border-light);
-  transition: width 0.2s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .sidebar.collapsed {
   width: 60px;
+}
+
+.sidebar * {
+  transition: opacity 0.2s ease;
 }
 
 .sidebar-header {
@@ -255,7 +289,7 @@ body {
   justify-content: center;
   cursor: pointer;
   z-index: 10;
-  transition: all 0.3s ease;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease;
   color: var(--text-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }

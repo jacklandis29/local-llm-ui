@@ -3,10 +3,10 @@
   align-items: center;
   gap: 20px;
   padding: 8px 16px;
-  background: #212121;
-  border-top: 1px solid rgba(47, 47, 47, 0.5);
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-light);
   font-size: 12px;
-  color: #8e8e8e;
+  color: var(--text-secondary);
 }
 
 .performance-stat {
@@ -16,11 +16,11 @@
 }
 
 .performance-label {
-  color: #6e6e6e;
+  color: var(--text-tertiary);
 }
 
 .performance-value {
-  color: #ececec;
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -29,13 +29,13 @@
   align-items: center;
   gap: 6px;
   margin-left: auto;
-  color: #60a5fa;
+  color: var(--link-color);
 }
 
 .streaming-dot {
   width: 6px;
   height: 6px;
-  background: #60a5fa;
+  background: var(--link-color);
   border-radius: 50%;
   animation: pulse 1.5s ease-in-out infinite;
 }
