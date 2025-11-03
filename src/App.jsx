@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
 import MarkdownRenderer from './components/MarkdownRenderer';
 import PerformanceBar from './components/PerformanceBar';
-
-const STORAGE_KEY = 'local-llm-chats';
-const MEMORY_KEY = 'local-llm-memory';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { useTheme } from './hooks/useTheme';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useMemory } from './hooks/useMemory';
+import { STORAGE_KEYS, TEXTAREA_MAX_HEIGHT } from './constants';
+import { streamChatCompletion, generateChatTitle, exportChat, downloadFile } from './utils/chatUtils';
 
 function App() {
-  const [chats, setChats] = useState([]);
+  // State management with custom hooks
+  const [chats, setChats] = useLocalStorage(STORAGE_KEYS.CHATS, []);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -18,92 +22,32 @@ function App() {
     responseTime: null,
     isStreaming: false,
   });
-  const [sharedMemory, setSharedMemory] = useState([]); // Shared context across chats
+
+  // Custom hooks
+  const [theme, toggleTheme] = useTheme();
+  const { extractMemory, buildMessagesWithContext } = useMemory();
+
+  // Refs
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const initializedRef = useRef(false);
 
-  const API_URL = 'http://localhost:1234/v1/chat/completions';
-
-  // Load chats and memory from localStorage on mount
+  // Initialize: Create first chat if none exists
   useEffect(() => {
-    if (initializedRef.current) return; // Only run once
-    
-    try {
-      const savedChats = localStorage.getItem(STORAGE_KEY);
-      const savedMemory = localStorage.getItem(MEMORY_KEY);
-      
-      if (savedChats) {
-        const parsedChats = JSON.parse(savedChats);
-        if (parsedChats.length > 0) {
-          setChats(parsedChats);
-          setCurrentChatId(parsedChats[0].id);
-          initializedRef.current = true;
-        } else {
-          // Empty array saved, create new chat
-          const newChat = {
-            id: Date.now(),
-            title: 'New Chat',
-            messages: [],
-            createdAt: new Date().toISOString(),
-          };
-          setChats([newChat]);
-          setCurrentChatId(newChat.id);
-          initializedRef.current = true;
-        }
-      } else {
-        // No saved chats, create new one
-        const newChat = {
-          id: Date.now(),
-          title: 'New Chat',
-          messages: [],
-          createdAt: new Date().toISOString(),
-        };
-        setChats([newChat]);
-        setCurrentChatId(newChat.id);
-        initializedRef.current = true;
-      }
-      
-      if (savedMemory) {
-        setSharedMemory(JSON.parse(savedMemory));
-      }
-    } catch (error) {
-      console.error('Error loading from localStorage:', error);
-      // Fallback: create new chat on error
-      const newChat = {
-        id: Date.now(),
-        title: 'New Chat',
-        messages: [],
-        createdAt: new Date().toISOString(),
-      };
+    if (initializedRef.current) return;
+
+    if (chats.length === 0) {
+      const newChat = createChatObject();
       setChats([newChat]);
       setCurrentChatId(newChat.id);
-      initializedRef.current = true;
+    } else {
+      setCurrentChatId(chats[0].id);
     }
-  }, []);
 
-  // Save chats to localStorage whenever they change
-  useEffect(() => {
-    if (initializedRef.current) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
-      } catch (error) {
-        console.error('Error saving chats to localStorage:', error);
-      }
-    }
-  }, [chats]);
+    initializedRef.current = true;
+  }, [chats, setChats]);
 
-  // Save memory to localStorage whenever it changes
-  useEffect(() => {
-    if (sharedMemory.length > 0) {
-      try {
-        localStorage.setItem(MEMORY_KEY, JSON.stringify(sharedMemory));
-      } catch (error) {
-        console.error('Error saving memory to localStorage:', error);
-      }
-    }
-  }, [sharedMemory]);
-
+  // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -112,29 +56,52 @@ function App() {
     scrollToBottom();
   }, [chats, currentChatId]);
 
-  const createNewChat = useCallback(() => {
-    const newChat = {
-      id: Date.now(),
-      title: 'New Chat',
-      messages: [],
-      createdAt: new Date().toISOString(),
-    };
-    setChats(prevChats => {
-      const updated = [newChat, ...prevChats];
-      return updated;
-    });
-    setCurrentChatId(newChat.id);
-  }, []);
-
   // Dynamic textarea resizing
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       const scrollHeight = textareaRef.current.scrollHeight;
-      const maxHeight = 200;
-      textareaRef.current.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+      textareaRef.current.style.height = `${Math.min(scrollHeight, TEXTAREA_MAX_HEIGHT)}px`;
     }
   }, [input]);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    'ctrl+n': handleNewChat,
+    'ctrl+k': () => console.log('Search not yet implemented'),
+    'ctrl+l': () => textareaRef.current?.focus(),
+    'ctrl+b': () => setSidebarCollapsed(prev => !prev),
+    'ctrl+d': toggleTheme,
+  });
+
+  // Helper functions
+  function createChatObject(title = 'New Chat') {
+    return {
+      id: Date.now(),
+      title,
+      messages: [],
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  function getCurrentChat() {
+    return chats.find(chat => chat.id === currentChatId);
+  }
+
+  function updateCurrentChat(updateFn) {
+    setChats(prevChats =>
+      prevChats.map(chat =>
+        chat.id === currentChatId ? updateFn(chat) : chat
+      )
+    );
+  }
+
+  // Chat operations
+  function handleNewChat() {
+    const newChat = createChatObject();
+    setChats(prevChats => [newChat, ...prevChats]);
+    setCurrentChatId(newChat.id);
+  }
 
   const deleteChat = (chatId) => {
     const updatedChats = chats.filter(chat => chat.id !== chatId);
@@ -144,369 +111,166 @@ function App() {
     }
   };
 
-  const getCurrentChat = () => {
-    return chats.find(chat => chat.id === currentChatId);
-  };
+  const handleExportChat = useCallback((format = 'json') => {
+    const currentChat = getCurrentChat();
+    if (!currentChat) return;
 
-  const generateChatTitle = async (chatId, userMessage, assistantMessage) => {
-    try {
-      // Create a prompt asking the model to generate a short title
-      const titlePrompt = `Based on this conversation, generate a short, descriptive title (3-6 words maximum). Be concise and specific.
+    const content = exportChat(currentChat, format);
+    const filename = `${currentChat.title.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${format === 'markdown' ? 'md' : format}`;
+    const mimeType = format === 'json' ? 'application/json' : 'text/plain';
 
-User: ${userMessage}
-Assistant: ${assistantMessage}
+    downloadFile(content, filename, mimeType);
+  }, [currentChatId, chats]);
 
-Title:`;
+  const regenerateLastMessage = useCallback(() => {
+    const currentChat = getCurrentChat();
+    if (!currentChat || currentChat.messages.length < 2) return;
 
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            { role: 'user', content: titlePrompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 20,
-          stream: false,
-        }),
-      });
+    // Remove the last assistant message
+    const messagesWithoutLast = currentChat.messages.slice(0, -1);
 
-      if (!response.ok) {
-        throw new Error(`Title generation failed: ${response.status}`);
-      }
+    // Get the last user message
+    const lastUserMessage = messagesWithoutLast[messagesWithoutLast.length - 1];
+    if (lastUserMessage?.role !== 'user') return;
 
-      const data = await response.json();
-      const generatedTitle = data.choices[0]?.message?.content?.trim() || '';
-      
-      // Clean up the title (remove quotes, limit length)
-      let cleanTitle = generatedTitle
-        .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-        .replace(/^title:\s*/i, '') // Remove "Title:" prefix if present
-        .trim();
-      
-      // Limit to 50 characters
-      if (cleanTitle.length > 50) {
-        cleanTitle = cleanTitle.slice(0, 47).trim() + '...';
-      }
-      
-      // Fallback to first message if title generation failed
-      if (!cleanTitle || cleanTitle.length < 3) {
-        cleanTitle = userMessage.slice(0, 50).trim() + (userMessage.length > 50 ? '...' : '');
-      }
+    // Update chat to remove last message
+    updateCurrentChat(chat => ({ ...chat, messages: messagesWithoutLast }));
 
-      // Update chat title
-      setChats(prevChats => prevChats.map(chat => {
-        if (chat.id === chatId && chat.title === 'New Chat') {
-          return { ...chat, title: cleanTitle };
-        }
-        return chat;
-      }));
-    } catch (error) {
-      console.error('Error generating chat title:', error);
-      // Fallback to using first message as title
-      const fallbackTitle = userMessage.slice(0, 50).trim() + (userMessage.length > 50 ? '...' : '');
-      setChats(prevChats => prevChats.map(chat => {
-        if (chat.id === chatId && chat.title === 'New Chat') {
-          return { ...chat, title: fallbackTitle };
-        }
-        return chat;
-      }));
-    }
-  };
+    // Re-send the last user message
+    handleSendMessage(lastUserMessage.content, messagesWithoutLast);
+  }, [currentChatId, chats]);
 
-  // Build messages array with shared memory context
-  const buildMessagesWithContext = (chatMessages) => {
-    const messages = [];
-    
-    // Add shared memory context at the beginning (system-like context)
-    if (sharedMemory.length > 0) {
-      // Combine all memory into a single system message for better context
-      const memoryContent = sharedMemory.map(m => m.content).join('. ') + '.';
-      messages.push({
-        role: 'system',
-        content: `Context from previous conversations: ${memoryContent}`,
-      });
-    }
-    
-    // Add current chat messages
-    messages.push(...chatMessages);
-    
-    return messages;
-  };
-
-  // Extract key information for shared memory from user messages
-  const extractMemory = (userMessage, assistantMessage = '') => {
-    const combinedText = `${userMessage} ${assistantMessage}`.toLowerCase();
-    
-    // Patterns to extract personal information
-    const patterns = [
-      { regex: /my name is ([\w\s]+?)(?:\.|,|\s|$)/i, type: 'name', format: (match) => `The user's name is ${match.trim()}` },
-      { regex: /i'm ([\w\s]+?)(?:\.|,|\s|$)/i, type: 'name', format: (match) => `The user's name is ${match.trim()}` },
-      { regex: /i am ([\w\s]+?)(?:\.|,|\s|$)/i, type: 'name', format: (match) => `The user's name is ${match.trim()}` },
-      { regex: /call me ([\w\s]+?)(?:\.|,|\s|$)/i, type: 'name', format: (match) => `The user's name is ${match.trim()}` },
-      { regex: /name is ([\w\s]+?)(?:\.|,|\s|$)/i, type: 'name', format: (match) => `The user's name is ${match.trim()}` },
-      { regex: /i'm called ([\w\s]+?)(?:\.|,|\s|$)/i, type: 'name', format: (match) => `The user's name is ${match.trim()}` },
-    ];
-    
-    for (const pattern of patterns) {
-      const match = combinedText.match(pattern.regex);
-      if (match && match[1]) {
-        const extractedInfo = match[1].trim();
-        // Skip if too short or too long (likely false positive)
-        if (extractedInfo.length < 2 || extractedInfo.length > 30) continue;
-        
-        const memoryContent = pattern.format(extractedInfo);
-        
-        // Check if this info is already in memory (case-insensitive)
-        const exists = sharedMemory.some(m => {
-          const existingLower = m.content.toLowerCase();
-          const newLower = memoryContent.toLowerCase();
-          return existingLower === newLower || 
-                 (existingLower.includes('name is') && newLower.includes('name is') && 
-                  existingLower.split('name is')[1]?.trim() === newLower.split('name is')[1]?.trim());
-        });
-        
-        if (!exists) {
-          setSharedMemory(prev => {
-            // Remove any existing name entries first (only one name)
-            if (pattern.type === 'name') {
-              const filtered = prev.filter(m => !m.content.toLowerCase().includes('name is'));
-              return [
-                ...filtered,
-                {
-                  role: 'system',
-                  content: memoryContent,
-                  createdAt: new Date().toISOString(),
-                }
-              ];
-            }
-            return [
-              ...prev,
-              {
-                role: 'system',
-                content: memoryContent,
-                createdAt: new Date().toISOString(),
-              }
-            ];
-          });
-          console.log('Extracted memory:', memoryContent);
-        }
-      }
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMessage = input.trim();
-    setInput('');
-    setIsLoading(true);
-    setPerformance({ tokensPerSecond: null, totalTokens: null, responseTime: null, isStreaming: true });
+  // Message sending
+  const handleSendMessage = async (messageContent = input.trim(), existingMessages = null) => {
+    if (!messageContent || isLoading) return;
 
     const currentChat = getCurrentChat();
     if (!currentChat) return;
 
-    // Extract memory from user message BEFORE adding to chat
-    extractMemory(userMessage, '');
+    setInput('');
+    setIsLoading(true);
+    setPerformance({ tokensPerSecond: null, totalTokens: null, responseTime: null, isStreaming: true });
 
-    const updatedMessages = [...currentChat.messages, { role: 'user', content: userMessage }];
+    // Extract memory from user message
+    extractMemory(messageContent, '');
+
+    // Use existing messages or add new user message
+    const updatedMessages = existingMessages
+      ? existingMessages
+      : [...currentChat.messages, { role: 'user', content: messageContent }];
+
     const isFirstMessage = currentChat.messages.length === 0;
-    
-    // Update chat with messages (title will be generated after assistant responds)
-    setChats(prevChats => prevChats.map(chat => {
-      if (chat.id === currentChatId) {
-        return { ...chat, messages: updatedMessages };
-      }
-      return chat;
-    }));
+
+    // Update chat with user message
+    updateCurrentChat(chat => ({ ...chat, messages: updatedMessages }));
 
     // Add empty assistant message for streaming
     const assistantMessageId = Date.now();
-    setChats(prevChats => prevChats.map(chat => 
-      chat.id === currentChatId 
-        ? { ...chat, messages: [...updatedMessages, { role: 'assistant', content: '', id: assistantMessageId }] }
-        : chat
-    ));
+    updateCurrentChat(chat => ({
+      ...chat,
+      messages: [...updatedMessages, { role: 'assistant', content: '', id: assistantMessageId }]
+    }));
 
-    // Build messages with shared context
+    // Build messages with context
     const messagesWithContext = buildMessagesWithContext(updatedMessages);
 
-    const startTime = Date.now();
-    let accumulatedContent = '';
-    let tokenCount = 0;
-    let lastUpdateTime = startTime;
+    // Stream completion
+    let lastContent = '';
+    let lastUpdateTime = Date.now();
 
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: messagesWithContext,
-          temperature: 0.7,
-          max_tokens: 2000,
-          stream: true,
-        }),
-      });
+    await streamChatCompletion(
+      messagesWithContext,
+      // onChunk
+      ({ content, tokenCount, tokensPerSecond, responseTime }) => {
+        lastContent = content;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        // Update message content
+        updateCurrentChat(chat => ({
+          ...chat,
+          messages: chat.messages.map(msg =>
+            msg.id === assistantMessageId ? { ...msg, content } : msg
+          )
+        }));
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') {
-              break;
-            }
-
-            try {
-              const json = JSON.parse(data);
-              const delta = json.choices[0]?.delta;
-              
-              if (delta?.content) {
-                accumulatedContent += delta.content;
-                tokenCount++;
-                
-                const currentContent = accumulatedContent;
-                
-                setChats(prevChats => prevChats.map(chat => 
-                  chat.id === currentChatId 
-                    ? { 
-                        ...chat, 
-                        messages: chat.messages.map(msg => 
-                          msg.id === assistantMessageId 
-                            ? { ...msg, content: currentContent }
-                            : msg
-                        )
-                      }
-                    : chat
-                ));
-
-                const currentTime = Date.now();
-                const elapsed = (currentTime - startTime) / 1000;
-                const tps = tokenCount / elapsed;
-
-                if (currentTime - lastUpdateTime > 500) {
-                  setPerformance({
-                    tokensPerSecond: tps,
-                    totalTokens: tokenCount,
-                    responseTime: currentTime - startTime,
-                    isStreaming: true,
-                  });
-                  lastUpdateTime = currentTime;
-                }
-
-                scrollToBottom();
-              }
-
-              // Check for final usage stats
-              if (json.usage) {
-                const endTime = Date.now();
-                const totalTime = endTime - startTime;
-                const finalTokens = json.usage.completion_tokens || tokenCount;
-                const finalTps = finalTokens / (totalTime / 1000);
-
-                setPerformance({
-                  tokensPerSecond: finalTps,
-                  totalTokens: json.usage.total_tokens || finalTokens,
-                  responseTime: totalTime,
-                  isStreaming: false,
-                });
-              }
-            } catch (e) {
-              // Ignore JSON parse errors for incomplete chunks
-            }
-          }
+        // Update performance (throttled)
+        const now = Date.now();
+        if (now - lastUpdateTime > 500) {
+          setPerformance({
+            tokensPerSecond,
+            totalTokens: tokenCount,
+            responseTime,
+            isStreaming: true,
+          });
+          lastUpdateTime = now;
         }
+
+        scrollToBottom();
+      },
+      // onComplete
+      ({ content, tokensPerSecond, totalTokens, responseTime }) => {
+        // Remove the streaming ID
+        updateCurrentChat(chat => ({
+          ...chat,
+          messages: chat.messages.map(msg =>
+            msg.id === assistantMessageId ? { ...msg, content, id: undefined } : msg
+          )
+        }));
+
+        // Extract memory from response
+        extractMemory(messageContent, content);
+
+        // Generate title if first message
+        if (isFirstMessage) {
+          generateChatTitle(messageContent, content).then(title => {
+            updateCurrentChat(chat =>
+              chat.title === 'New Chat' ? { ...chat, title } : chat
+            );
+          });
+        }
+
+        // Final performance update
+        setPerformance({
+          tokensPerSecond,
+          totalTokens,
+          responseTime,
+          isStreaming: false,
+        });
+
+        setIsLoading(false);
+      },
+      // onError
+      (error) => {
+        console.error('Error:', error);
+
+        updateCurrentChat(chat => ({
+          ...chat,
+          messages: chat.messages.map(msg =>
+            msg.id === assistantMessageId
+              ? {
+                  role: 'assistant',
+                  content: `❌ Error: ${error.message}\n\nMake sure LM Studio server is running and a model is loaded.`,
+                  id: undefined
+                }
+              : msg
+          )
+        }));
+
+        setPerformance({
+          tokensPerSecond: null,
+          totalTokens: null,
+          responseTime: null,
+          isStreaming: false,
+        });
+
+        setIsLoading(false);
       }
-
-      // Final update with complete message
-      setChats(prevChats => prevChats.map(chat => 
-        chat.id === currentChatId 
-          ? { 
-              ...chat, 
-              messages: chat.messages.map(msg => 
-                msg.id === assistantMessageId 
-                  ? { ...msg, content: accumulatedContent, id: undefined }
-                  : msg
-              )
-            }
-          : chat
-      ));
-
-      // Extract memory from both user message and assistant response
-      const finalUserMessage = updatedMessages[updatedMessages.length - 1]?.content || '';
-      extractMemory(finalUserMessage, accumulatedContent);
-
-      // Generate title from model if this is the first message exchange
-      if (isFirstMessage) {
-        generateChatTitle(currentChatId, userMessage, accumulatedContent);
-      }
-
-      // Final performance update
-      const endTime = Date.now();
-      const totalTime = endTime - startTime;
-      const finalTps = tokenCount / (totalTime / 1000);
-      
-      setPerformance({
-        tokensPerSecond: finalTps,
-        totalTokens: tokenCount,
-        responseTime: totalTime,
-        isStreaming: false,
-      });
-
-    } catch (error) {
-      console.error('Error:', error);
-      
-      setChats(prevChats => prevChats.map(chat => 
-        chat.id === currentChatId 
-          ? { 
-              ...chat, 
-              messages: chat.messages.map(msg => 
-                msg.id === assistantMessageId 
-                  ? { 
-                      role: 'assistant', 
-                      content: '❌ Error: ' + error.message + '\n\nMake sure LM Studio server is running and a model is loaded.',
-                      id: undefined
-                    }
-                  : msg
-              )
-            }
-          : chat
-      ));
-
-      setPerformance({
-        tokensPerSecond: null,
-        totalTokens: null,
-        responseTime: null,
-        isStreaming: false,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      handleSendMessage();
     }
   };
 
@@ -514,15 +278,41 @@ Title:`;
 
   return (
     <div className="app">
+      {/* Sidebar */}
       <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
-          <button className="new-chat-btn" onClick={createNewChat}>
+          <button className="new-chat-btn" onClick={handleNewChat} title="New chat (Ctrl+N)">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
             {!sidebarCollapsed && <span>New chat</span>}
           </button>
+          {!sidebarCollapsed && (
+            <button
+              className="theme-toggle-btn"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode (Ctrl+D)`}
+            >
+              {theme === 'dark' ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="5"></circle>
+                  <line x1="12" y1="1" x2="12" y2="3"></line>
+                  <line x1="12" y1="21" x2="12" y2="23"></line>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                  <line x1="1" y1="12" x2="3" y2="12"></line>
+                  <line x1="21" y1="12" x2="23" y2="12"></line>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+              )}
+            </button>
+          )}
         </div>
 
         <div className="chat-list">
@@ -538,17 +328,34 @@ Title:`;
               {!sidebarCollapsed && (
                 <>
                   <span className="chat-title">{chat.title}</span>
-                  <button
-                    className="delete-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteChat(chat.id);
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                  </button>
+                  <div className="chat-actions">
+                    <button
+                      className="chat-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleExportChat('json');
+                      }}
+                      title="Export chat"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                    </button>
+                    <button
+                      className="delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteChat(chat.id);
+                      }}
+                      title="Delete chat"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    </button>
+                  </div>
                 </>
               )}
             </div>
@@ -556,15 +363,18 @@ Title:`;
         </div>
       </div>
 
+      {/* Sidebar collapse button */}
       <button
         className="collapse-btn"
         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        title={`${sidebarCollapsed ? 'Expand' : 'Collapse'} sidebar (Ctrl+B)`}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d={sidebarCollapsed ? "M9 18l6-6-6-6" : "M15 18l-6-6 6-6"}></path>
         </svg>
       </button>
 
+      {/* Main content */}
       <div className="main-content">
         <div className="messages-container">
           {currentChat && currentChat.messages.length === 0 ? (
@@ -576,6 +386,15 @@ Title:`;
                 </svg>
               </div>
               <h2>How can I help you today?</h2>
+              <div className="keyboard-shortcuts-hint">
+                <p>Keyboard shortcuts:</p>
+                <ul>
+                  <li><kbd>Ctrl+N</kbd> New chat</li>
+                  <li><kbd>Ctrl+D</kbd> Toggle theme</li>
+                  <li><kbd>Ctrl+B</kbd> Toggle sidebar</li>
+                  <li><kbd>Ctrl+L</kbd> Focus input</li>
+                </ul>
+              </div>
             </div>
           ) : (
             <div className="messages">
@@ -613,6 +432,18 @@ Title:`;
                         </div>
                       ) : null}
                     </div>
+                    {message.role === 'assistant' && !isLoading && index === currentChat.messages.length - 1 && (
+                      <button
+                        className="regenerate-btn"
+                        onClick={regenerateLastMessage}
+                        title="Regenerate response"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="23 4 23 10 17 10"></polyline>
+                          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -621,6 +452,7 @@ Title:`;
           )}
         </div>
 
+        {/* Input area */}
         <div className="input-area">
           <PerformanceBar
             tokensPerSecond={performance.tokensPerSecond}
@@ -639,9 +471,10 @@ Title:`;
               disabled={isLoading}
             />
             <button
-              onClick={sendMessage}
+              onClick={() => handleSendMessage()}
               disabled={isLoading || !input.trim()}
               className="send-btn"
+              title="Send message (Enter)"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="19" x2="12" y2="5"></line>
