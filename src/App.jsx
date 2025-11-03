@@ -2,11 +2,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
 import MarkdownRenderer from './components/MarkdownRenderer';
 import PerformanceBar from './components/PerformanceBar';
+import KnowledgeBaseModal from './components/KnowledgeBaseModal';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useTheme } from './hooks/useTheme';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useMemory } from './hooks/useMemory';
-import { STORAGE_KEYS, TEXTAREA_MAX_HEIGHT } from './constants';
+import { useKnowledgeBase } from './hooks/useKnowledgeBase';
+import { STORAGE_KEYS, TEXTAREA_MAX_HEIGHT, KNOWLEDGE_CONTEXT_LIMIT } from './constants';
 import { streamChatCompletion, generateChatTitle, exportChat, downloadFile } from './utils/chatUtils';
 
 function App() {
@@ -26,6 +28,17 @@ function App() {
   // Custom hooks
   const [theme, toggleTheme] = useTheme();
   const { extractMemory, buildMessagesWithContext } = useMemory();
+  const {
+    knowledgeBase,
+    isProcessing,
+    processingStatus,
+    addFiles,
+    removeFile,
+    getKnowledgeContext,
+  } = useKnowledgeBase();
+
+  // Knowledge base modal state
+  const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
 
   // Refs
   const messagesEndRef = useRef(null);
@@ -72,6 +85,7 @@ function App() {
     'ctrl+l': () => textareaRef.current?.focus(),
     'ctrl+b': () => setSidebarCollapsed(prev => !prev),
     'ctrl+d': toggleTheme,
+    'ctrl+u': () => setIsKnowledgeBaseOpen(true),
   });
 
   // Helper functions
@@ -140,6 +154,21 @@ function App() {
     handleSendMessage(lastUserMessage.content, messagesWithoutLast);
   }, [currentChatId, chats]);
 
+  // Knowledge base operations
+  const handleAddFiles = async (files) => {
+    const { results, errors } = await addFiles(files);
+
+    if (errors.length > 0) {
+      alert(`Some files failed to upload:\n${errors.map(e => `${e.file}: ${e.error}`).join('\n')}`);
+    }
+
+    return results;
+  };
+
+  const handleRemoveFile = (fileId) => {
+    removeFile(fileId);
+  };
+
   // Message sending
   const handleSendMessage = async (messageContent = input.trim(), existingMessages = null) => {
     if (!messageContent || isLoading) return;
@@ -171,8 +200,20 @@ function App() {
       messages: [...updatedMessages, { role: 'assistant', content: '', id: assistantMessageId }]
     }));
 
-    // Build messages with context
-    const messagesWithContext = buildMessagesWithContext(updatedMessages);
+    // Build messages with context (memory + knowledge base)
+    let messagesWithContext = buildMessagesWithContext(updatedMessages);
+
+    // Add knowledge base context if files are available
+    if (knowledgeBase.length > 0) {
+      const knowledgeContext = getKnowledgeContext(KNOWLEDGE_CONTEXT_LIMIT);
+      messagesWithContext = [
+        {
+          role: 'system',
+          content: knowledgeContext
+        },
+        ...messagesWithContext
+      ];
+    }
 
     // Stream completion
     let lastContent = '';
@@ -289,29 +330,43 @@ function App() {
             {!sidebarCollapsed && <span>New chat</span>}
           </button>
           {!sidebarCollapsed && (
-            <button
-              className="theme-toggle-btn"
-              onClick={toggleTheme}
-              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode (Ctrl+D)`}
-            >
-              {theme === 'dark' ? (
+            <>
+              <button
+                className="theme-toggle-btn"
+                onClick={toggleTheme}
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode (Ctrl+D)`}
+              >
+                {theme === 'dark' ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                  </svg>
+                )}
+              </button>
+              <button
+                className="knowledge-base-btn"
+                onClick={() => setIsKnowledgeBaseOpen(true)}
+                title="Knowledge Base (Ctrl+U)"
+              >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="5"></circle>
-                  <line x1="12" y1="1" x2="12" y2="3"></line>
-                  <line x1="12" y1="21" x2="12" y2="23"></line>
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                  <line x1="1" y1="12" x2="3" y2="12"></line>
-                  <line x1="21" y1="12" x2="23" y2="12"></line>
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                 </svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                </svg>
-              )}
-            </button>
+                {knowledgeBase.length > 0 && (
+                  <span className="knowledge-base-badge">{knowledgeBase.length}</span>
+                )}
+              </button>
+            </>
           )}
         </div>
 
@@ -393,6 +448,7 @@ function App() {
                   <li><kbd>Ctrl+D</kbd> Toggle theme</li>
                   <li><kbd>Ctrl+B</kbd> Toggle sidebar</li>
                   <li><kbd>Ctrl+L</kbd> Focus input</li>
+                  <li><kbd>Ctrl+U</kbd> Knowledge base</li>
                 </ul>
               </div>
             </div>
@@ -484,6 +540,17 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Knowledge Base Modal */}
+      <KnowledgeBaseModal
+        isOpen={isKnowledgeBaseOpen}
+        onClose={() => setIsKnowledgeBaseOpen(false)}
+        knowledgeBase={knowledgeBase}
+        onAddFiles={handleAddFiles}
+        onRemoveFile={handleRemoveFile}
+        isProcessing={isProcessing}
+        processingStatus={processingStatus}
+      />
     </div>
   );
 }

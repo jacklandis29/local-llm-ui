@@ -115,6 +115,39 @@ body {
   border-color: var(--text-tertiary);
 }
 
+.knowledge-base-btn {
+  padding: 12px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.knowledge-base-btn:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--text-tertiary);
+}
+
+.knowledge-base-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--link-color);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
 .collapsed .new-chat-btn {
   justify-content: center;
   padding: 12px;

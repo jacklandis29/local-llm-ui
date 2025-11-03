@@ -1,0 +1,115 @@
+.file-upload-container {
+  width: 100%;
+}
+
+.file-upload-dropzone {
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: var(--bg-primary);
+}
+
+.file-upload-dropzone:hover {
+  border-color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+.file-upload-dropzone.dragging {
+  border-color: var(--link-color);
+  background: var(--bg-tertiary);
+  transform: scale(1.02);
+}
+
+.file-upload-dropzone.processing {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.file-upload-icon {
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+}
+
+.file-upload-icon svg.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.file-upload-text {
+  color: var(--text-secondary);
+}
+
+.file-upload-primary {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.file-upload-secondary {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.file-upload-tertiary {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.file-upload-info {
+  margin-top: 16px;
+}
+
+.file-upload-info details {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.file-upload-info summary {
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.file-upload-info summary:hover {
+  color: var(--text-primary);
+}
+
+.file-types-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.file-type-category {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.file-type-category strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.file-type-category span {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}

@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   CHATS: 'local-llm-chats',
   MEMORY: 'local-llm-memory',
   THEME: 'local-llm-theme',
+  KNOWLEDGE_BASE: 'local-llm-knowledge-base',
 };
 
 // UI Constants
@@ -66,4 +67,9 @@ export const KEYBOARD_SHORTCUTS = {
   FOCUS_INPUT: { key: 'l', ctrl: true, description: 'Focus input' },
   TOGGLE_SIDEBAR: { key: 'b', ctrl: true, description: 'Toggle sidebar' },
   TOGGLE_THEME: { key: 'd', ctrl: true, description: 'Toggle theme' },
+  UPLOAD_FILE: { key: 'u', ctrl: true, description: 'Upload file' },
 };
+
+// File Upload
+export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+export const KNOWLEDGE_CONTEXT_LIMIT = 5; // Number of files to include in context

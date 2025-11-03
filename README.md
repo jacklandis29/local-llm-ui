@@ -22,6 +22,9 @@ A modern, ChatGPT-style interface for your local LLM running on LM Studio. Built
 - **Shared Memory**: Context retention across chat sessions
 - **Auto-generated Titles**: Intelligent chat naming based on content
 - **Error Boundaries**: Graceful error handling with recovery options
+- **Knowledge Base**: Upload files (PDF, DOCX, TXT, code, etc.) to build your AI's long-term memory
+- **File Processing**: Automatic text extraction from PDFs, Word documents, and various file types
+- **Persistent Knowledge**: Files stored locally and available across all conversations
 
 ### Keyboard Shortcuts
 
@@ -29,6 +32,7 @@ A modern, ChatGPT-style interface for your local LLM running on LM Studio. Built
 - **Ctrl+D**: Toggle light/dark theme
 - **Ctrl+B**: Toggle sidebar
 - **Ctrl+L**: Focus input field
+- **Ctrl+U**: Open knowledge base
 - **Enter**: Send message
 - **Shift+Enter**: New line in input
 
@@ -82,15 +86,20 @@ local-llm-ui/
 │   ├── components/          # React components
 │   │   ├── CodeBlock.jsx
 │   │   ├── ErrorBoundary.jsx
+│   │   ├── FileLibrary.jsx
+│   │   ├── FileUpload.jsx
+│   │   ├── KnowledgeBaseModal.jsx
 │   │   ├── MarkdownRenderer.jsx
 │   │   └── PerformanceBar.jsx
 │   ├── hooks/               # Custom React hooks
 │   │   ├── useKeyboardShortcuts.js
+│   │   ├── useKnowledgeBase.js
 │   │   ├── useLocalStorage.js
 │   │   ├── useMemory.js
 │   │   └── useTheme.js
 │   ├── utils/               # Utility functions
-│   │   └── chatUtils.js
+│   │   ├── chatUtils.js
+│   │   └── fileProcessors.js
 │   ├── constants/           # Application constants
 │   │   └── index.js
 │   ├── App.jsx             # Main application component
@@ -131,6 +140,49 @@ The application connects to LM Studio's OpenAI-compatible API:
   - Temperature: 0.7
   - Max Tokens: 2000
   - Stream: true
+
+## Knowledge Base - Building Your Personal AI
+
+The Knowledge Base feature allows you to upload files that become part of your AI's long-term memory, helping create a truly personalized AI assistant.
+
+### How It Works
+
+1. **Upload Files**: Press `Ctrl+U` or click the folder icon in the sidebar
+2. **Automatic Processing**: Files are automatically processed and text is extracted
+3. **Persistent Storage**: All files are stored locally in your browser
+4. **Contextual Availability**: File content is automatically included in conversations as context
+
+### Supported File Types
+
+- **Documents**: PDF, DOCX, TXT, Markdown
+- **Code**: JavaScript, TypeScript, Python, Java, C/C++, Go, Rust, Ruby, PHP, and more
+- **Data**: JSON, XML, YAML, TOML, CSV
+- **Web**: HTML, CSS
+
+### Use Cases
+
+- **Project Documentation**: Upload project docs, README files, technical specifications
+- **Personal Notes**: Your journal entries, meeting notes, research notes
+- **Code Repositories**: Upload code files for the AI to understand your codebase
+- **Learning Materials**: Study notes, course materials, research papers
+- **Life Context**: Personal information, preferences, goals, routines
+
+### File Management
+
+- **Search**: Quickly find files by name or content
+- **Preview**: View file contents before using them
+- **Remove**: Delete files you no longer need
+- **Statistics**: Track total files and storage used
+
+### Building Your "Jarvis"
+
+This feature is designed to help you create a personal AI assistant that:
+- Knows about your projects and codebase
+- Understands your personal context and preferences
+- Retains information across model updates
+- Grows smarter as you add more context
+
+The knowledge base persists in browser localStorage, so your AI's memory survives even when you upgrade to better models.
 
 ## Troubleshooting
 
