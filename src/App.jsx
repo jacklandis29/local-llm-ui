@@ -16,6 +16,7 @@ function App() {
   const [chats, setChats] = useLocalStorage(STORAGE_KEYS.CHATS, []);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [input, setInput] = useState('');
+  const [selectedImages, setSelectedImages] = useState([]); // For multi-modal support
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [performance, setPerformance] = useState({
@@ -43,6 +44,7 @@ function App() {
   // Refs
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const imageInputRef = useRef(null); // For image upload
   const initializedRef = useRef(false);
 
   // Initialize: Create first chat if none exists
@@ -100,6 +102,58 @@ function App() {
     'ctrl+d': toggleTheme,
     'ctrl+u': () => setIsKnowledgeBaseOpen(true),
   });
+
+  // Image paste handler
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            handleImageFile(file);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, []);
+
+  // Image handling functions
+  const handleImageFile = async (file) => {
+    if (!file.type.startsWith('image/')) return;
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result;
+      setSelectedImages(prev => [...prev, {
+        id: Date.now() + Math.random(),
+        name: file.name,
+        type: file.type,
+        data: base64,
+        size: file.size,
+      }]);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => handleImageFile(file));
+    // Reset input
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = (imageId) => {
+    setSelectedImages(prev => prev.filter(img => img.id !== imageId));
+  };
 
   // Helper functions
   function createChatObject(title = 'New Chat') {
@@ -184,7 +238,7 @@ function App() {
 
   // Message sending
   const handleSendMessage = async (messageContent = input.trim(), existingMessages = null) => {
-    if (!messageContent || isLoading) return;
+    if ((!messageContent && selectedImages.length === 0) || isLoading) return;
 
     const currentChat = getCurrentChat();
     if (!currentChat) return;
@@ -196,10 +250,34 @@ function App() {
     // Extract memory from user message
     extractMemory(messageContent, '');
 
+    // Create user message with optional images
+    let userMessage;
+    if (selectedImages.length > 0) {
+      // Multi-modal format (OpenAI vision API)
+      userMessage = {
+        role: 'user',
+        content: [
+          { type: 'text', text: messageContent || 'What is in this image?' },
+          ...selectedImages.map(img => ({
+            type: 'image_url',
+            image_url: { url: img.data }
+          }))
+        ],
+        images: selectedImages, // Store for display in UI
+      };
+    } else {
+      // Text-only message
+      userMessage = { role: 'user', content: messageContent };
+    }
+
+    // Clear selected images
+    const imagesToSend = [...selectedImages];
+    setSelectedImages([]);
+
     // Use existing messages or add new user message
     const updatedMessages = existingMessages
       ? existingMessages
-      : [...currentChat.messages, { role: 'user', content: messageContent }];
+      : [...currentChat.messages, userMessage];
 
     const isFirstMessage = currentChat.messages.length === 0;
 
@@ -483,6 +561,21 @@ function App() {
                       )}
                     </div>
                     <div className="message-content">
+                      {/* Display images if present (for user messages) */}
+                      {message.images && message.images.length > 0 && (
+                        <div className="message-images">
+                          {message.images.map((img, imgIndex) => (
+                            <img
+                              key={imgIndex}
+                              src={img.data}
+                              alt={img.name || 'Uploaded image'}
+                              className="message-image"
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Display text content */}
                       {message.content ? (
                         message.role === 'assistant' ? (
                           <>
@@ -492,7 +585,11 @@ function App() {
                             )}
                           </>
                         ) : (
-                          <div className="message-text">{message.content}</div>
+                          <div className="message-text">
+                            {typeof message.content === 'string'
+                              ? message.content
+                              : message.content.find(c => c.type === 'text')?.text || ''}
+                          </div>
                         )
                       ) : isLoading && message.role === 'assistant' ? (
                         <div className="typing-indicator">
@@ -530,19 +627,65 @@ function App() {
             responseTime={performance.responseTime}
             isStreaming={performance.isStreaming}
           />
+          {/* Image preview area */}
+          {selectedImages.length > 0 && (
+            <div className="image-preview-area">
+              {selectedImages.map((img) => (
+                <div key={img.id} className="image-preview-item">
+                  <img src={img.data} alt={img.name} />
+                  <button
+                    className="image-remove-btn"
+                    onClick={() => removeImage(img.id)}
+                    title="Remove image"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="input-wrapper">
+            {/* Hidden file input */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageUpload}
+              style={{ display: 'none' }}
+            />
+
+            {/* Image upload button */}
+            <button
+              className="image-upload-btn"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={isLoading}
+              title="Upload image (or paste)"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </button>
+
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Message..."
+              placeholder="Message... (paste images with Ctrl+V)"
               rows="1"
               disabled={isLoading}
             />
+
             <button
               onClick={() => handleSendMessage()}
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || (!input.trim() && selectedImages.length === 0)}
               className="send-btn"
               title="Send message (Enter)"
             >

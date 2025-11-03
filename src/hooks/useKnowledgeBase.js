@@ -130,9 +130,9 @@ export function useKnowledgeBase() {
     const recentFiles = sorted.slice(0, limit);
 
     // Build detailed context string with clear instructions
-    let context = `# KNOWLEDGE BASE DOCUMENTS
+    let context = `# USER'S PERSONAL KNOWLEDGE BASE
 
-You have access to the following documents uploaded by the user. Use these documents to answer questions accurately. DO NOT make up information that is not in these documents.
+The following documents have been uploaded by the user and contain important information. Read them carefully and use them to answer questions accurately.
 
 `;
 
@@ -148,7 +148,14 @@ You have access to the following documents uploaded by the user. Use these docum
       context += `---\n\n`;
     });
 
-    context += `When answering questions, reference these documents by name (e.g., "${recentFiles[0]?.fileName}"). If the answer is not in the documents, say so clearly.\n\n`;
+    context += `# INSTRUCTIONS FOR USING THESE DOCUMENTS
+
+1. The information in these documents is authoritative - trust what you read in them
+2. When answering questions about these documents, cite specific details from them
+3. If asked about something not covered in the documents, you may use your general knowledge but make it clear you're doing so
+4. When referencing information from a document, mention which document it came from (e.g., "According to ${recentFiles[0]?.fileName}...")
+
+`;
 
     return context;
   }, [knowledgeBase]);
