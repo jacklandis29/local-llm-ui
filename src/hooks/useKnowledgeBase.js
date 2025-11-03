@@ -114,9 +114,9 @@ export function useKnowledgeBase() {
 
   /**
    * Get context from knowledge base for chat
-   * This creates a summary of relevant files to include in the conversation
+   * This creates a detailed context with full file contents for the model to reference
    */
-  const getKnowledgeContext = useCallback((limit = 5) => {
+  const getKnowledgeContext = useCallback((limit = 5, maxCharsPerFile = 4000) => {
     if (knowledgeBase.length === 0) return '';
 
     // Sort by most recently added/used
@@ -129,19 +129,26 @@ export function useKnowledgeBase() {
     // Take the most recent files up to limit
     const recentFiles = sorted.slice(0, limit);
 
-    // Build context string
-    let context = 'Available knowledge base files:\n\n';
-    recentFiles.forEach(file => {
-      context += `File: ${file.fileName}\n`;
-      if (file.summary) {
-        context += `Summary: ${file.summary}\n`;
-      } else {
-        // Use first 200 characters as preview
-        const preview = file.content.slice(0, 200).trim();
-        context += `Preview: ${preview}${file.content.length > 200 ? '...' : ''}\n`;
-      }
-      context += '\n';
+    // Build detailed context string with clear instructions
+    let context = `# KNOWLEDGE BASE DOCUMENTS
+
+You have access to the following documents uploaded by the user. Use these documents to answer questions accurately. DO NOT make up information that is not in these documents.
+
+`;
+
+    recentFiles.forEach((file, index) => {
+      context += `## Document ${index + 1}: ${file.fileName}\n\n`;
+
+      // Include full content up to maxCharsPerFile, or entire file if smaller
+      const content = file.content.length > maxCharsPerFile
+        ? file.content.slice(0, maxCharsPerFile) + '\n\n[... content truncated ...]'
+        : file.content;
+
+      context += `\`\`\`\n${content}\n\`\`\`\n\n`;
+      context += `---\n\n`;
     });
+
+    context += `When answering questions, reference these documents by name (e.g., "${recentFiles[0]?.fileName}"). If the answer is not in the documents, say so clearly.\n\n`;
 
     return context;
   }, [knowledgeBase]);

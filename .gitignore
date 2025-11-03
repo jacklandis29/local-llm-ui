@@ -32,3 +32,11 @@ yarn-error.log*
 # OS
 Thumbs.db
 
+# Electron
+/dist
+/out
+*.log
+
+# Environment
+.env
+

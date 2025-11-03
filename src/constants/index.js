@@ -73,3 +73,4 @@ export const KEYBOARD_SHORTCUTS = {
 // File Upload
 export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 export const KNOWLEDGE_CONTEXT_LIMIT = 5; // Number of files to include in context
+export const MAX_CHARS_PER_FILE = 8000; // Max characters per file to send as context

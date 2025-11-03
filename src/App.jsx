@@ -8,7 +8,7 @@ import { useTheme } from './hooks/useTheme';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useMemory } from './hooks/useMemory';
 import { useKnowledgeBase } from './hooks/useKnowledgeBase';
-import { STORAGE_KEYS, TEXTAREA_MAX_HEIGHT, KNOWLEDGE_CONTEXT_LIMIT } from './constants';
+import { STORAGE_KEYS, TEXTAREA_MAX_HEIGHT, KNOWLEDGE_CONTEXT_LIMIT, MAX_CHARS_PER_FILE } from './constants';
 import { streamChatCompletion, generateChatTitle, exportChat, downloadFile } from './utils/chatUtils';
 
 function App() {
@@ -218,7 +218,8 @@ function App() {
 
     // Add knowledge base context if files are available
     if (knowledgeBase.length > 0) {
-      const knowledgeContext = getKnowledgeContext(KNOWLEDGE_CONTEXT_LIMIT);
+      const knowledgeContext = getKnowledgeContext(KNOWLEDGE_CONTEXT_LIMIT, MAX_CHARS_PER_FILE);
+      // Insert knowledge base as a system message at the start
       messagesWithContext = [
         {
           role: 'system',
