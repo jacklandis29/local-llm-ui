@@ -72,15 +72,25 @@ npm run electron:build
 
 ## Application Icons
 
-To customize the app icon, replace these files in the `assets/` directory:
+**Current status**: The app uses default Electron icons. To add custom icons later:
 
-- `assets/icon.ico` - Windows icon (256x256)
-- `assets/icon.icns` - macOS icon (1024x1024)
-- `assets/icon.png` - Linux icon (512x512)
+1. Create your icon files (see `assets/README.md` for detailed instructions):
+   - `assets/icon.ico` - Windows icon (256x256)
+   - `assets/icon.icns` - macOS icon (1024x1024)
+   - `assets/icon.png` - Linux icon (512x512)
 
-You can use tools like:
-- [iConvert Icons](https://iconverticons.com/online/)
-- [CloudConvert](https://cloudconvert.com/)
+2. Add icon paths back to `package.json` in the `build` section:
+   ```json
+   "win": { "icon": "assets/icon.ico" }
+   "mac": { "icon": "assets/icon.icns" }
+   "linux": { "icon": "assets/icon.png" }
+   ```
+
+3. Rebuild the app
+
+**Recommended tools**:
+- [iConvert Icons](https://iconverticons.com/online/) - Upload PNG, download all formats
+- [CloudConvert](https://cloudconvert.com/) - Convert between formats
 
 ## Features in Desktop App
 

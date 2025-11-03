@@ -1,6 +1,6 @@
 # Local LLM UI
 
-A modern, ChatGPT-style interface for your local LLM running on LM Studio. Built with React and designed for desktop use with plans to become a native application.
+A modern, ChatGPT-style interface for your local LLM running on LM Studio. Built with React and Electron - available as both a web app and a native desktop application.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![React](https://img.shields.io/badge/react-18.2.0-blue)
@@ -72,11 +72,20 @@ A modern, ChatGPT-style interface for your local LLM running on LM Studio. Built
    - Verify it's running on port 1234 (or your configured port)
 
 5. **Start the application**
+
+   **Option A: Web Browser**
    ```bash
    npm start
    ```
-
    The browser will open automatically at `http://localhost:3000`
+
+   **Option B: Native Desktop App** ⭐ Recommended
+   ```bash
+   npm run electron:dev
+   ```
+   Launches the app as a native desktop application with menu bar and keyboard shortcuts
+
+   See [DESKTOP_APP.md](DESKTOP_APP.md) for building installers for Windows, macOS, and Linux
 
 ## Project Structure
 
@@ -106,9 +115,15 @@ local-llm-ui/
 │   ├── App.css             # Application styles
 │   ├── index.js            # Entry point
 │   └── index.css           # Global styles
+├── electron/                # Desktop app (Electron)
+│   ├── main.js             # Main process
+│   └── preload.js          # Preload script (IPC bridge)
+├── assets/                  # Desktop app assets
+│   └── README.md           # Icon creation guide
 ├── public/                  # Static assets
 ├── package.json            # Dependencies and scripts
 ├── .env.example            # Environment variables template
+├── DESKTOP_APP.md          # Desktop app build guide
 ├── FEATURE_ROADMAP.md      # Planned features
 └── README.md               # This file
 ```
@@ -211,10 +226,21 @@ The knowledge base persists in browser localStorage, so your AI's memory survive
 
 ### Available Scripts
 
-- `npm start` - Start development server
+**Web App:**
+- `npm start` - Start development server (browser)
 - `npm run build` - Build for production
+
+**Desktop App:**
+- `npm run electron:dev` - Start desktop app in development mode
+- `npm run electron:build:win` - Build Windows installer (.exe)
+- `npm run electron:build:mac` - Build macOS disk image (.dmg)
+- `npm run electron:build:linux` - Build Linux AppImage and .deb
+
+**Testing:**
 - `npm test` - Run tests
 - `npm run eject` - Eject from Create React App (irreversible)
+
+See [DESKTOP_APP.md](DESKTOP_APP.md) for complete desktop app documentation
 
 ### Adding Features
 
@@ -223,7 +249,7 @@ Refer to `FEATURE_ROADMAP.md` for planned features and priorities.
 ## Future Plans
 
 ### High Priority
-- Native desktop application (Electron/Tauri)
+- ✅ ~~Native desktop application (Electron/Tauri)~~ - **COMPLETED!**
 - Conversation search
 - Message editing with branching
 - Model switching interface
@@ -231,7 +257,7 @@ Refer to `FEATURE_ROADMAP.md` for planned features and priorities.
 
 ### Medium Priority
 - Web search integration
-- File upload and processing
+- ✅ ~~File upload and processing~~ - **COMPLETED!**
 - Advanced memory system
 - Plugin architecture
 
@@ -264,8 +290,10 @@ This is a personal project, but suggestions are welcome! Please see `FEATURE_ROA
 ## Tech Stack
 
 - **Frontend**: React 18
+- **Desktop Framework**: Electron (with electron-builder)
 - **Markdown**: react-markdown with remark-gfm
 - **Code Highlighting**: react-syntax-highlighter
+- **File Processing**: PDF.js (PDFs), Mammoth (DOCX)
 - **Styling**: Pure CSS with CSS custom properties
 - **API**: LM Studio (OpenAI-compatible)
 

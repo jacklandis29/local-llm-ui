@@ -72,24 +72,21 @@
       "target": [
         "nsis",
         "portable"
-      ],
-      "icon": "assets/icon.ico"
+      ]
     },
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.productivity",
-      "icon": "assets/icon.icns"
+      "category": "public.app-category.productivity"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "category": "Utility",
-      "icon": "assets/icon.png"
+      "category": "Utility"
     },
     "nsis": {
       "oneClick": false,
