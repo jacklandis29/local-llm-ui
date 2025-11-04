@@ -1,4 +1,4 @@
-import { API_ENDPOINTS, DEFAULT_MODEL_PARAMS, TITLE_MAX_LENGTH } from '../constants';
+import { API_ENDPOINTS, API_MODEL_NAME, DEFAULT_MODEL_PARAMS, TITLE_MAX_LENGTH } from '../constants';
 
 /**
  * Generate a chat title based on the first exchange
@@ -12,17 +12,24 @@ Assistant: ${assistantMessage}
 
 Title:`;
 
+    const requestBody = {
+      messages: [{ role: 'user', content: titlePrompt }],
+      temperature: 0.7,
+      max_tokens: 20,
+      stream: false,
+    };
+
+    // Add model name if specified
+    if (API_MODEL_NAME) {
+      requestBody.model = API_MODEL_NAME;
+    }
+
     const response = await fetch(API_ENDPOINTS.CHAT_COMPLETIONS, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: titlePrompt }],
-        temperature: 0.7,
-        max_tokens: 20,
-        stream: false,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -67,21 +74,43 @@ export async function streamChatCompletion(messages, onChunk, onComplete, onErro
   let tokenCount = 0;
 
   try {
+    const requestBody = {
+      messages,
+      temperature: DEFAULT_MODEL_PARAMS.temperature,
+      max_tokens: DEFAULT_MODEL_PARAMS.maxTokens,
+      stream: DEFAULT_MODEL_PARAMS.stream,
+    };
+
+    // Add model name if specified (important for vision models)
+    if (API_MODEL_NAME) {
+      requestBody.model = API_MODEL_NAME;
+    }
+
+    console.log('Sending request to:', API_ENDPOINTS.CHAT_COMPLETIONS);
+    console.log('Request body:', JSON.stringify(requestBody, null, 2));
+
     const response = await fetch(API_ENDPOINTS.CHAT_COMPLETIONS, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        messages,
-        temperature: DEFAULT_MODEL_PARAMS.temperature,
-        max_tokens: DEFAULT_MODEL_PARAMS.maxTokens,
-        stream: DEFAULT_MODEL_PARAMS.stream,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Try to get more details about the error
+      let errorDetails = `HTTP ${response.status} ${response.statusText}`;
+      try {
+        const errorBody = await response.text();
+        if (errorBody) {
+          errorDetails += `\n\nResponse: ${errorBody}`;
+        }
+      } catch (e) {
+        // Ignore if we can't read the error body
+      }
+
+      console.error('API Error:', errorDetails);
+      throw new Error(`HTTP error! status: ${response.status}\n\n${errorDetails}`);
     }
 
     const reader = response.body.getReader();

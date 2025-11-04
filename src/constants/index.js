@@ -1,5 +1,6 @@
 // API Configuration
 export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:1234';
+export const API_MODEL_NAME = process.env.REACT_APP_MODEL_NAME || ''; // Optional model name
 export const API_ENDPOINTS = {
   CHAT_COMPLETIONS: `${API_BASE_URL}/v1/chat/completions`,
 };
