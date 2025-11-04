@@ -137,10 +137,6 @@ function App() {
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files || []);
     files.forEach(file => handleImageFile(file));
-    // Reset input
-    if (imageInputRef.current) {
-      imageInputRef.current.value = '';
-    }
   };
 
   const removeImage = (imageId) => {

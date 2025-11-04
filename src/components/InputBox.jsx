@@ -38,6 +38,16 @@ function InputBox({
     }
   };
 
+  const handleFileInputChange = (e) => {
+    if (onImageUpload) {
+      onImageUpload(e);
+      // Reset file input after upload so same file can be selected again
+      if (imageInputRef.current) {
+        imageInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className={`input-box-container ${centered ? 'centered' : 'bottom'}`}>
       {/* Image previews */}
@@ -68,7 +78,7 @@ function InputBox({
           type="file"
           accept="image/*"
           multiple
-          onChange={onImageUpload}
+          onChange={handleFileInputChange}
           style={{ display: 'none' }}
         />
 
