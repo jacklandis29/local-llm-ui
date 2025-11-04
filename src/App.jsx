@@ -3,6 +3,9 @@ import './App.css';
 import MarkdownRenderer from './components/MarkdownRenderer';
 import PerformanceBar from './components/PerformanceBar';
 import KnowledgeBaseModal from './components/KnowledgeBaseModal';
+import ContextMenu from './components/ContextMenu';
+import EmptyState from './components/EmptyState';
+import InputBox from './components/InputBox';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useTheme } from './hooks/useTheme';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -40,6 +43,12 @@ function App() {
 
   // Knowledge base modal state
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState(null); // { chatId, position: { top, left } }
+
+  // Rename modal state
+  const [renameModal, setRenameModal] = useState(null); // { chatId, currentName }
 
   // Refs
   const messagesEndRef = useRef(null);
@@ -162,6 +171,8 @@ function App() {
       title,
       messages: [],
       createdAt: new Date().toISOString(),
+      starred: false,
+      projectId: null,
     };
   }
 
@@ -190,6 +201,66 @@ function App() {
     if (currentChatId === chatId) {
       setCurrentChatId(updatedChats.length > 0 ? updatedChats[0].id : null);
     }
+  };
+
+  // Context menu handlers
+  const handleContextMenu = (event, chatId) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setContextMenu({
+      chatId,
+      position: {
+        top: rect.bottom + 4,
+        left: rect.left,
+      },
+    });
+  };
+
+  const handleStarChat = (chatId) => {
+    setChats(prevChats =>
+      prevChats.map(chat =>
+        chat.id === chatId ? { ...chat, starred: !chat.starred } : chat
+      )
+    );
+  };
+
+  const handleRenameChat = (chatId) => {
+    const chat = chats.find(c => c.id === chatId);
+    if (chat) {
+      setRenameModal({ chatId, currentName: chat.title });
+    }
+  };
+
+  const handleRenameSubmit = (newName) => {
+    if (renameModal && newName.trim()) {
+      setChats(prevChats =>
+        prevChats.map(chat =>
+          chat.id === renameModal.chatId ? { ...chat, title: newName.trim() } : chat
+        )
+      );
+    }
+    setRenameModal(null);
+  };
+
+  const handleAddToProject = (chatId) => {
+    // Placeholder for future project functionality
+    console.log('Add to project:', chatId);
+    alert('Project functionality coming soon!');
+  };
+
+  const handleActionClick = (actionId) => {
+    // Handle action button clicks from EmptyState
+    const actionPrompts = {
+      write: "Help me write something...",
+      learn: "Teach me about...",
+      code: "Help me code...",
+      life: "Give me advice on...",
+      surprise: "Surprise me with something interesting!",
+    };
+
+    const prompt = actionPrompts[actionId] || "";
+    setInput(prompt);
   };
 
   const handleExportChat = useCallback((format = 'json') => {
@@ -462,11 +533,13 @@ function App() {
           )}
         </div>
 
+        {!sidebarCollapsed && <div className="chat-list-label">Recents</div>}
+
         <div className="chat-list">
           {chats.map(chat => (
             <div
               key={chat.id}
-              className={`chat-item ${chat.id === currentChatId ? 'active' : ''}`}
+              className={`chat-item ${chat.id === currentChatId ? 'active' : ''} ${chat.starred ? 'starred' : ''}`}
               onClick={() => setCurrentChatId(chat.id)}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -474,35 +547,25 @@ function App() {
               </svg>
               {!sidebarCollapsed && (
                 <>
-                  <span className="chat-title">{chat.title}</span>
-                  <div className="chat-actions">
-                    <button
-                      className="chat-action-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleExportChat('json');
-                      }}
-                      title="Export chat"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                  <span className="chat-title">
+                    {chat.starred && (
+                      <svg className="star-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                       </svg>
-                    </button>
-                    <button
-                      className="delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteChat(chat.id);
-                      }}
-                      title="Delete chat"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                      </svg>
-                    </button>
-                  </div>
+                    )}
+                    {chat.title}
+                  </span>
+                  <button
+                    className="chat-menu-btn"
+                    onClick={(e) => handleContextMenu(e, chat.id)}
+                    title="More options"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="1"></circle>
+                      <circle cx="12" cy="5" r="1"></circle>
+                      <circle cx="12" cy="19" r="1"></circle>
+                    </svg>
+                  </button>
                 </>
               )}
             </div>

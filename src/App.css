@@ -6,20 +6,23 @@
 
 /* Theme Variables */
 :root[data-theme="dark"] {
-  --bg-primary: #212121;
-  --bg-secondary: #171717;
+  /* Claude-like darker theme */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #202020;
   --bg-tertiary: #2a2a2a;
-  --bg-hover: #3a3a3a;
-  --text-primary: #ececec;
-  --text-secondary: #8e8e8e;
-  --text-tertiary: #6e6e6e;
-  --border-color: #4a4a4a;
-  --border-light: #2f2f2f;
-  --primary-color: #ececec;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.1);
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #707070;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-light: rgba(255, 255, 255, 0.05);
+  --primary-color: #e0e0e0;
   --primary-hover: #ffffff;
-  --error-color: #ff5555;
+  --error-color: #ef4444;
   --link-color: #60a5fa;
   --link-hover: #90c5fa;
+  --sidebar-width: 260px;
 }
 
 :root[data-theme="light"] {
@@ -27,6 +30,7 @@
   --bg-secondary: #f7f7f8;
   --bg-tertiary: #ececf1;
   --bg-hover: #e5e5ea;
+  --bg-active: #d1d1d6;
   --text-primary: #2d2d2d;
   --text-secondary: #6b6b6b;
   --text-tertiary: #8e8e8e;
@@ -37,6 +41,7 @@
   --error-color: #dc2626;
   --link-color: #2563eb;
   --link-hover: #1d4ed8;
+  --sidebar-width: 260px;
 }
 
 body {
