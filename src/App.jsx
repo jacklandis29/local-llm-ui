@@ -52,8 +52,6 @@ function App() {
 
   // Refs
   const messagesEndRef = useRef(null);
-  const textareaRef = useRef(null);
-  const imageInputRef = useRef(null); // For image upload
   const initializedRef = useRef(false);
 
   // Initialize: Create first chat if none exists
@@ -88,25 +86,10 @@ function App() {
     }
   }, [currentChatId, scrollToBottom, isLoading]);
 
-  // Dynamic textarea resizing (optimized with requestAnimationFrame)
-  useEffect(() => {
-    if (textareaRef.current) {
-      // Use RAF to prevent layout thrashing
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          const scrollHeight = textareaRef.current.scrollHeight;
-          textareaRef.current.style.height = `${Math.min(scrollHeight, TEXTAREA_MAX_HEIGHT)}px`;
-        }
-      });
-    }
-  }, [input]);
-
   // Keyboard shortcuts
   useKeyboardShortcuts({
     'ctrl+n': handleNewChat,
     'ctrl+k': () => console.log('Search not yet implemented'),
-    'ctrl+l': () => textareaRef.current?.focus(),
     'ctrl+b': () => setSidebarCollapsed(prev => !prev),
     'ctrl+d': toggleTheme,
     'ctrl+u': () => setIsKnowledgeBaseOpen(true),
@@ -471,13 +454,6 @@ function App() {
     );
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
   const currentChat = getCurrentChat();
 
   return (
@@ -586,180 +562,162 @@ function App() {
 
       {/* Main content */}
       <div className="main-content">
-        <div className="messages-container">
-          {currentChat && currentChat.messages.length === 0 ? (
-            <div className="welcome-screen">
-              <div className="welcome-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path>
-                  <path d="M12 6v6l4 2"></path>
-                </svg>
-              </div>
-              <h2>How can I help you today?</h2>
-              <div className="keyboard-shortcuts-hint">
-                <p>Keyboard shortcuts:</p>
-                <ul>
-                  <li><kbd>Ctrl+N</kbd> New chat</li>
-                  <li><kbd>Ctrl+D</kbd> Toggle theme</li>
-                  <li><kbd>Ctrl+B</kbd> Toggle sidebar</li>
-                  <li><kbd>Ctrl+L</kbd> Focus input</li>
-                  <li><kbd>Ctrl+U</kbd> Knowledge base</li>
-                </ul>
-              </div>
-            </div>
-          ) : (
-            <div className="messages">
-              {currentChat?.messages.map((message, index) => (
-                <div key={index} className={`message-row ${message.role}`}>
-                  <div className="message-wrapper">
-                    <div className="message-avatar">
-                      {message.role === 'user' ? (
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-                        </svg>
-                      ) : (
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                      )}
-                    </div>
-                    <div className="message-content">
-                      {/* Display images if present (for user messages) */}
-                      {message.images && message.images.length > 0 && (
-                        <div className="message-images">
-                          {message.images.map((img, imgIndex) => (
-                            <img
-                              key={imgIndex}
-                              src={img.data}
-                              alt={img.name || 'Uploaded image'}
-                              className="message-image"
-                            />
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Display text content */}
-                      {message.content ? (
-                        message.role === 'assistant' ? (
-                          <>
-                            <MarkdownRenderer content={message.content} />
-                            {isLoading && message.id && (
-                              <span className="streaming-cursor">▋</span>
-                            )}
-                          </>
-                        ) : (
-                          <div className="message-text">
-                            {typeof message.content === 'string'
-                              ? message.content
-                              : message.content.find(c => c.type === 'text')?.text || ''}
-                          </div>
-                        )
-                      ) : isLoading && message.role === 'assistant' ? (
-                        <div className="typing-indicator">
-                          <span></span>
-                          <span></span>
-                          <span></span>
-                        </div>
-                      ) : null}
-                    </div>
-                    {message.role === 'assistant' && !isLoading && index === currentChat.messages.length - 1 && (
-                      <button
-                        className="regenerate-btn"
-                        onClick={regenerateLastMessage}
-                        title="Regenerate response"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="23 4 23 10 17 10"></polyline>
-                          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-
-        {/* Input area */}
-        <div className="input-area">
-          <PerformanceBar
-            tokensPerSecond={performance.tokensPerSecond}
-            totalTokens={performance.totalTokens}
-            responseTime={performance.responseTime}
-            isStreaming={performance.isStreaming}
+        {currentChat && currentChat.messages.length === 0 ? (
+          // Empty state with centered input
+          <EmptyState
+            input={input}
+            setInput={setInput}
+            onSend={() => handleSendMessage()}
+            isLoading={isLoading}
+            selectedImages={selectedImages}
+            onRemoveImage={removeImage}
+            onImageUpload={handleImageUpload}
+            onActionClick={handleActionClick}
           />
-          {/* Image preview area */}
-          {selectedImages.length > 0 && (
-            <div className="image-preview-area">
-              {selectedImages.map((img) => (
-                <div key={img.id} className="image-preview-item">
-                  <img src={img.data} alt={img.name} />
-                  <button
-                    className="image-remove-btn"
-                    onClick={() => removeImage(img.id)}
-                    title="Remove image"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  </button>
-                </div>
-              ))}
+        ) : (
+          // Active chat with messages and bottom input
+          <>
+            <div className="messages-container">
+              <div className="messages">
+                {currentChat?.messages.map((message, index) => (
+                  <div key={index} className={`message-row ${message.role}`}>
+                    <div className="message-wrapper">
+                      <div className="message-avatar">
+                        {message.role === 'user' ? (
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                          </svg>
+                        ) : (
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                          </svg>
+                        )}
+                      </div>
+                      <div className="message-content">
+                        {/* Display images if present (for user messages) */}
+                        {message.images && message.images.length > 0 && (
+                          <div className="message-images">
+                            {message.images.map((img, imgIndex) => (
+                              <img
+                                key={imgIndex}
+                                src={img.data}
+                                alt={img.name || 'Uploaded image'}
+                                className="message-image"
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Display text content */}
+                        {message.content ? (
+                          message.role === 'assistant' ? (
+                            <>
+                              <MarkdownRenderer content={message.content} />
+                              {isLoading && message.id && (
+                                <span className="streaming-cursor">▋</span>
+                              )}
+                            </>
+                          ) : (
+                            <div className="message-text">
+                              {typeof message.content === 'string'
+                                ? message.content
+                                : message.content.find(c => c.type === 'text')?.text || ''}
+                            </div>
+                          )
+                        ) : isLoading && message.role === 'assistant' ? (
+                          <div className="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                          </div>
+                        ) : null}
+                      </div>
+                      {message.role === 'assistant' && !isLoading && index === currentChat.messages.length - 1 && (
+                        <button
+                          className="regenerate-btn"
+                          onClick={regenerateLastMessage}
+                          title="Regenerate response"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
             </div>
-          )}
 
-          <div className="input-wrapper">
-            {/* Hidden file input */}
+            {/* Performance bar */}
+            <PerformanceBar
+              tokensPerSecond={performance.tokensPerSecond}
+              totalTokens={performance.totalTokens}
+              responseTime={performance.responseTime}
+              isStreaming={performance.isStreaming}
+            />
+
+            {/* Input at bottom for active chat */}
+            <InputBox
+              input={input}
+              setInput={setInput}
+              onSend={() => handleSendMessage()}
+              isLoading={isLoading}
+              centered={false}
+              selectedImages={selectedImages}
+              onRemoveImage={removeImage}
+              onImageUpload={handleImageUpload}
+            />
+          </>
+        )}
+      </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          chat={chats.find(c => c.id === contextMenu.chatId)}
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+          onStar={handleStarChat}
+          onRename={handleRenameChat}
+          onAddToProject={handleAddToProject}
+          onDelete={deleteChat}
+        />
+      )}
+
+      {/* Rename Modal */}
+      {renameModal && (
+        <div className="modal-overlay" onClick={() => setRenameModal(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Rename chat</h3>
             <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageUpload}
-              style={{ display: 'none' }}
+              type="text"
+              defaultValue={renameModal.currentName}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleRenameSubmit(e.target.value);
+                }
+              }}
+              autoFocus
+              placeholder="Enter new name"
             />
-
-            {/* Image upload button */}
-            <button
-              className="image-upload-btn"
-              onClick={() => imageInputRef.current?.click()}
-              disabled={isLoading}
-              title="Upload image (or paste)"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
-            </button>
-
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Message... (paste images with Ctrl+V)"
-              rows="1"
-              disabled={isLoading}
-            />
-
-            <button
-              onClick={() => handleSendMessage()}
-              disabled={isLoading || (!input.trim() && selectedImages.length === 0)}
-              className="send-btn"
-              title="Send message (Enter)"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="19" x2="12" y2="5"></line>
-                <polyline points="5 12 12 5 19 12"></polyline>
-              </svg>
-            </button>
+            <div className="modal-actions">
+              <button onClick={() => setRenameModal(null)}>Cancel</button>
+              <button
+                className="primary"
+                onClick={(e) => {
+                  const input = e.target.closest('.modal-content').querySelector('input');
+                  handleRenameSubmit(input.value);
+                }}
+              >
+                Rename
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Knowledge Base Modal */}
       <KnowledgeBaseModal
